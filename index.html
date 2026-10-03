@@ -275,6 +275,37 @@ body:has(.slot:not([hidden])){overflow:hidden}
   .machine .stage{width:min(97vw, calc((100dvh - 380px) * 1.13))}
   .stagetop .banner{font-size:8px;padding:5px 6px}
 }
+/* landscape phone (or any short window): reels in the middle sized by the height, BONUS BUY to their left,
+   LAST WIN + a big SPIN to their right, and one slim control row along the bottom */
+@media (orientation:landscape) and (max-height:560px){
+  .slotbar{padding:2px 10px}
+  .brand{font-size:13px;text-shadow:2px 2px 0 #000}
+  .soundbtns .pill{font-size:7px;padding:5px 8px;border-width:2px}
+  .barspacer{display:none}
+  .machine{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);grid-template-rows:auto auto auto;grid-template-areas:'. stage win' '. stage spin' '. stage msg';align-content:center;align-items:center;justify-items:center;gap:6px 16px;padding:2px 12px}
+  .stagewrap{grid-area:stage;display:block;position:relative}
+  .machine .stage{width:calc((100dvh - 128px) * 1.25 + 14px);max-width:58vw;padding:6px;border-width:3px;border-radius:14px}
+  .stagetop{margin-bottom:4px}
+  .stagetop .mascot{width:26px;height:26px;margin:0}
+  .stagetop .banner{font-size:7px;padding:3px 6px;line-height:1.35}
+  .gridbox{--gap:5px}
+  .sidebuy{position:absolute;right:calc(100% + 14px);top:50%;transform:translateY(-50%);width:clamp(74px,12vw,112px);padding:12px 6px;border-radius:18px;font-size:9px;line-height:1.5;margin:0;box-shadow:0 4px 0 #141414}
+  .sidebuy br{display:inline}
+  .winrow{grid-area:win;flex-direction:column;align-items:stretch;gap:6px;width:min(220px,100%)}
+  .winarea{padding:2px 12px;justify-content:space-between}
+  .winarea .k{font-size:9px}.winarea .v{font-size:22px}
+  .spinwrap{grid-area:spin;width:min(220px,100%)}
+  .spin{width:100%;height:64px;font-size:16px;border-radius:18px;box-shadow:0 5px 0 #141414}
+  .machine .msg{grid-area:msg;font-size:11px;max-width:220px}
+  .machine .odds{display:none}
+  .ctrlbar{display:flex;flex-wrap:nowrap;justify-content:space-between;align-items:center;gap:8px;padding:4px 10px calc(4px + env(safe-area-inset-bottom))}
+  .ctrlbar .iconbtn{width:42px;height:36px;gap:4px;padding:0 9px;margin:0;box-shadow:0 3px 0 #141414}
+  .ctrlbar .iconbtn span{height:4px}
+  .ctl .k{font-size:7px}.ctl b{font-size:18px}
+  .round{width:28px;height:28px;font-size:16px}
+  .ctrlbar .tools{flex-wrap:nowrap;gap:5px}
+  .pill{font-size:7px;padding:6px 8px;border-width:2px}
+}
 .odds{font-family:var(--f-d);font-size:9px;letter-spacing:.04em;color:#fff;background:rgba(10,8,18,.7);border:2px solid #141414;border-radius:999px;padding:5px 12px;text-shadow:0 1px 0 #000}
 .odds b{color:#ffd21f;font-weight:400}
 /* confirmation for Bonus Boost, Trick Spins and buys: price, bet changer, odds for Bonus Boost */
@@ -340,7 +371,7 @@ body.replay .ctrlbar,body.replay #menubtn,body.replay .spinwrap,body.replay #buy
 .machine .juris{color:#fff;text-shadow:0 1px 2px #000}
 .modal{z-index:80}
 /* Stake's mini-player: a small pop-out window keeps the board and the essentials */
-@media (max-height:560px) and (max-width:720px){
+@media (max-height:560px) and (max-width:720px) and (orientation:portrait){
   .slotbar{padding:4px 8px}.brand{font-size:12px}.iconbtn{width:36px;height:32px}
   .machine{gap:4px;padding:2px 6px}
   .machine .stage{width:min(96vw, calc((100dvh - 245px) * 1.2));padding:5px;border-width:3px}
