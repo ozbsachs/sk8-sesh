@@ -2669,7 +2669,9 @@ async function spinAnim(g, mults, sticky, fast, isBonus, opt){
   cells.forEach(c=>c.classList.remove('hit')); $('lineov').innerHTML = '';
   const dg = g.slice(), dm = mults.slice();
   merged.forEach(mg=>{ if (mg.upgrade && !mg.anchor) return; for (let row=0;row<ROWS;row++){ const c = TT.cell(mg.r,row), f = mg.from.find(x=>x.c===c); dg[c] = mg.raw[row]; dm[c] = f ? f.m : mg.anchor && mg.anchor.c === c ? mg.anchor.m : 0; } });
-  if (fast || speed === 2){ if (speed === 2 && !fast) mascot('ollie'); document.querySelectorAll('.pinov').forEach(o=>o.remove()); for (let c=0;c<CELLS;c++){ if (hold[Math.floor(c/ROWS)]) continue; paintCell(c, dg[c], dm[c], sticky && sticky[c] > 0); } merged.forEach(mg=>setStack(mg.r, mg.M, !!opt.lock)); return false; }
+  if (fast || speed === 2){ if (speed === 2 && !fast) mascot('ollie'); document.querySelectorAll('.pinov').forEach(o=>o.remove());
+    // last spin's wild stacks go (the animated path drops them as each reel starts); held reels are redrawn from merged below
+    reelEls.forEach((el, r) => { if (!hold[r]){ const o = el.querySelector('.stackov'); if (o) o.remove(); } }); for (let c=0;c<CELLS;c++){ if (hold[Math.floor(c/ROWS)]) continue; paintCell(c, dg[c], dm[c], sticky && sticky[c] > 0); } merged.forEach(mg=>setStack(mg.r, mg.M, !!opt.lock)); return false; }
   sfx('spinStart'); mascot('ollie');
   // anticipation: two tapes of a kind down means the later reels spin longer (the outcome is already fixed).
   // The rising tape chime only starts at the 2nd tape of a kind; the first one lands quietly.
