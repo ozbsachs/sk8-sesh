@@ -2774,7 +2774,8 @@ const RGS = (() => {
     ok: !!(host && sessionID),
     authenticate: () => call('/wallet/authenticate', {sessionID, language: q.get('lang') || 'en'}),
     balance: () => call('/wallet/balance', {sessionID}),
-    play: (amount, mode) => call('/wallet/play', {sessionID, amount, mode}),
+    play: async (amount, mode) => { for (let i = 0; ; i++){ try { return await call('/wallet/play', {sessionID, amount, mode}); }
+      catch(e){ if (i < 4 && ['ERR_RATE','ERR_GLE','HTTP_429'].includes(e.code)){ await new Promise(r => setTimeout(r, 120)); continue; } throw e; } } },
     endRound: () => call('/wallet/end-round', {sessionID}),
     replay: (game, version, mode, event) => call(`/bet/replay/${encodeURIComponent(game)}/${encodeURIComponent(version)}/${encodeURIComponent(mode)}/${encodeURIComponent(event)}`, null, 'GET'),
     hasReplay: !!host,
