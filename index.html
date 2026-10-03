@@ -3112,5 +3112,218 @@ else if (RGS.ok) bootPlay();
 else { $('msg').textContent = 'Connecting to the casino...'; $('spinbtn').disabled = true; $('autobtn').disabled = true; }
 })();
 </script>
+<script>
+// Sk8Crowd: background skaters riding the park behind the slot (no sound). They follow the real obstacles in
+// sk8-park.svg: airs and tricks on the quarter pipe, grinds down the stair handrail and along the pink rail, and
+// some bails. Sk8Crowd.start(sceneEl) lays an SVG over the park with the same 1600x900 box and the same
+// "xMidYMax slice" fit as the park background, so the riders line up with the drawing at every screen size.
+// Three lanes (ramp, handrail, rail) each run one rider at a time with a random pause between runs.
+// Off for prefers-reduced-motion; paused while the tab is hidden.
+(function(root){
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
+  const lerp = (a, b, t) => a + (b - a)*t, clamp = (t, a = 0, b = 1) => Math.max(a, Math.min(b, t));
+  const smooth = t => { t = clamp(t); return t*t*(3 - 2*t); }, bump = t => Math.sin(Math.PI*clamp(t));
+  const norm = (x, y) => { const l = Math.hypot(x, y) || 1; return [x/l, y/l]; };
+  const span = (t, a, b) => clamp((t - a)/(b - a));
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+
+  // ---------- park geometry (sk8-park.svg coordinates) ----------
+  // quarter pipe face: quadratic curve from the ground to the coping (group translate(-537 371) scale(2.4))
+  const Q0 = [19.8, 639.8], QC = [235.8, 639.8], Q1 = [250.2, 452.6];
+  const qp = s => [(1-s)*(1-s)*Q0[0] + 2*(1-s)*s*QC[0] + s*s*Q1[0], (1-s)*(1-s)*Q0[1] + 2*(1-s)*s*QC[1] + s*s*Q1[1]];
+  const qt = s => norm(2*(1-s)*(QC[0]-Q0[0]) + 2*s*(Q1[0]-QC[0]), 2*(1-s)*(QC[1]-Q0[1]) + 2*s*(Q1[1]-QC[1]));
+  const LIP = qt(1);
+  // stair handrail (top right to bottom left), stair deck and the ground at the foot of the stairs
+  const H0 = [1346, 414], H1 = [1140, 563], DECK = 476.6, FOOT = 640;
+  const HU = norm(H1[0]-H0[0], H1[1]-H0[1]);
+  // pink rail in the foreground and the ground in front of it
+  const R0x = 950, R1x = 1228, RY = 752, RG = 826;
+
+  // ---------- one rider: a board group and a body group, each placed with its own frame ----------
+  const CAPS = ['#e8322d','#2d6cdf','#ffd21f','#35c46a','#ff3ea5','#ff8a1e','#9b5cff'];
+  const DECKS = ['#ff2fb0','#3be3ff','#ffe600','#9bff3b','#ff8a1e','#ffffff'];
+  function rider(layer){
+    const g = el('g', {opacity: 0}, layer);
+    const board = el('g', {}, g), boardInner = el('g', {}, board);
+    const deckCol = pick(DECKS);
+    el('path', {d: 'M-30 -8L-24 -4H24L30 -8', fill: 'none', stroke: '#141414', 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'}, boardInner);
+    el('path', {d: 'M-24 -4H24', stroke: deckCol, 'stroke-width': 2.5, 'stroke-linecap': 'round'}, boardInner);
+    el('circle', {cx: -15, cy: 1, r: 3.6, fill: '#fff', stroke: '#141414', 'stroke-width': 2.4}, boardInner);
+    el('circle', {cx: 15, cy: 1, r: 3.6, fill: '#fff', stroke: '#141414', 'stroke-width': 2.4}, boardInner);
+    const body = el('g', {}, g), bodyInner = el('g', {}, body);
+    const st = {fill: 'none', stroke: '#141414', 'stroke-width': 5.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'};
+    const legs = el('path', st, bodyInner), torso = el('path', st, bodyInner), arms = el('path', st, bodyInner);
+    const head = el('circle', {r: 9, fill: '#fff', stroke: '#141414', 'stroke-width': 4}, bodyInner);
+    const cap = el('path', {fill: pick(CAPS), stroke: '#141414', 'stroke-width': 2.5, 'stroke-linejoin': 'round'}, bodyInner);
+    // pose: c crouch 0..1, a arms 0 (down) .. 1 (up), grab (front hand to the nose), lean (-1..1), lift (feet above deck)
+    function pose(p){
+      const c = p.c || 0, a = p.a == null ? .35 : p.a, lean = p.lean || 0, lift = p.lift || 0;
+      const fy = -6 - lift, ff = [12, fy], fb = [-12, fy];
+      const hip = [-1 + lean*3, -42 + 15*c - lift*.6];
+      const kf = [(hip[0] + ff[0])/2 + 5 + 6*c, (hip[1] + fy)/2 - 1], kb = [(hip[0] + fb[0])/2 + 5 + 6*c, (hip[1] + fy)/2 - 1];
+      const neck = [hip[0] + 3 + 6*c + lean*6, hip[1] - 29 + 4*c];
+      const sh = [neck[0], neck[1] + 5];
+      // arms spread forward and back; a lifts them from down by the hips (-0.9 rad) to up by the head (+0.9 rad)
+      const ang = lerp(-.9, .9, a), hf = p.grab ? [17, fy - 3] : [sh[0] + 17*Math.cos(ang), sh[1] - 17*Math.sin(ang)];
+      const hb = [sh[0] - 17*Math.cos(ang), sh[1] - 17*Math.sin(ang)];
+      legs.setAttribute('d', `M${fb}L${kb}L${hip}L${kf}L${ff}`);
+      torso.setAttribute('d', `M${hip}L${neck}`);
+      arms.setAttribute('d', `M${hf}L${sh}L${hb}`);
+      const hx = neck[0] + 2, hy = neck[1] - 11;
+      head.setAttribute('cx', hx); head.setAttribute('cy', hy);
+      cap.setAttribute('d', `M${hx-9.5} ${hy-1}Q${hx-8} ${hy-14} ${hx+1} ${hy-12.5}Q${hx+9} ${hy-11} ${hx+9.5} ${hy-2}L${hx+15} ${hy-1}Z`);
+    }
+    // frame: position + facing direction u (unit); "up" is the side of u away from the surface, never pointing down
+    const place = (node, x, y, u, extra) => {
+      let up = [u[1], -u[0]]; if (up[1] > 1e-6) up = [-up[0], -up[1]];
+      node.setAttribute('transform', `matrix(${u[0]} ${u[1]} ${-up[0]} ${-up[1]} ${x} ${y})` + (extra || ''));
+    };
+    return {
+      g,
+      draw(f){
+        g.setAttribute('opacity', f.o == null ? 1 : f.o);
+        const b = f.board || f, by = f.body || f;
+        place(board, b.x, b.y, b.u, b.rot ? ` rotate(${b.rot})` : '');
+        const sx = Math.cos((f.shove || 0)*Math.PI/180), sy = Math.cos((f.flip || 0)*Math.PI/180), yaw = Math.cos((f.spin || 0)*Math.PI/180);
+        const bsx = Math.sign(sx*yaw || 1)*Math.max(.18, Math.abs(sx*yaw)), bsy = Math.sign(sy || 1)*Math.max(.15, Math.abs(sy));
+        boardInner.setAttribute('transform', `translate(0 ${-(f.boardLift || 0)}) scale(${bsx} ${bsy})`);
+        place(body, by.x, by.y, by.u, by.rot ? ` rotate(${by.rot})` : '');
+        bodyInner.setAttribute('transform', `scale(${Math.sign(yaw || 1)*Math.max(.2, Math.abs(yaw))} 1)`);
+        pose(f.pose || {});
+      },
+      remove(){ g.remove(); }
+    };
+  }
+
+  // ---------- runs: each is a list of segments {d (seconds), f(t) -> frame} ----------
+  const seq = segs => ({total: segs.reduce((s, x) => s + x.d, 0), at(tau){ let t = tau; for (const s of segs){ if (t <= s.d) return s.f(t/s.d); t -= s.d; } return null; }});
+  const fadeIn = t => smooth(t/.25), fadeOut = t => 1 - smooth((t - .7)/.3);
+  const ground = (x, y) => ({x, y, u: [1, 0]});
+
+  // quarter pipe: roll in from the left, up the face, a trick above the coping, back down fakie and out
+  function rampRun(trick){
+    const H = trick === 'rock' ? 0 : trick === 'indy' || trick === 'spin' ? 150 : 120;
+    const air = trick === 'rock' ? .9 : 1.1;
+    const bail = trick === 'bailflip' || trick === 'bailspin';
+    const segs = [
+      {d: 1.1, f: t => ({...ground(lerp(-90, Q0[0], t), Q0[1]), o: fadeIn(t), pose: {c: .25, a: .3}})},
+      {d: .6, f: t => { const s = t, [x, y] = qp(s); return {x, y, u: qt(s), pose: {c: .25 + .45*t, a: .35}}; }},
+      {d: air, f: t => {
+        const y = Q1[1] - 4*H*t*(1 - t), x = Q1[0] + (trick === 'rock' ? 4 : 10)*bump(t);
+        // the body swings from the wall angle toward upright at the top of the air, then back for the landing
+        const th = Math.atan2(LIP[1], LIP[0]), tu = lerp(th, -.18, .85*bump(t)), f = {x, y, u: [Math.cos(tu), Math.sin(tu)], pose: {c: .45, a: .5}};
+        if (trick === 'rock'){ f.pose = {c: .55, a: .4, lean: -.5}; f.board = {x: Q1[0] + 8, y: Q1[1] - 8, u: [0, -1], rot: 0}; f.body = {x: Q1[0] + 8, y: Q1[1] - 8, u: [lerp(-.2, .2, bump(t)), -1]}; f.body.u = norm(...f.body.u); return f; }
+        f.pose.c = .45 + .4*bump(t); f.boardLift = 5*bump(t);
+        if (trick === 'kickflip' || trick === 'bailflip') f.flip = (trick === 'bailflip' ? 250 : 360)*smooth(span(t, .12, .62));
+        if (trick === 'heelflip') f.flip = -360*smooth(span(t, .12, .62));
+        if (trick === 'shuv') f.shove = 180*smooth(span(t, .15, .65));
+        if (trick === 'spin' || trick === 'bailspin') f.spin = (trick === 'bailspin' ? 470 : 360)*smooth(span(t, .05, .9));
+        if (trick === 'indy'){ f.pose = {c: .85, a: .7, grab: t > .2 && t < .78}; f.boardLift = 3; }
+        if (trick === 'ollie') f.pose.a = .5 + .3*bump(t);
+        return f; }},
+    ];
+    if (!bail){
+      segs.push({d: .6, f: t => { const s = 1 - t, [x, y] = qp(s); return {x, y, u: qt(s), pose: {c: .6 - .3*t, a: .4}}; }});
+      segs.push({d: 1.1, f: t => ({...ground(lerp(Q0[0], -100, t), Q0[1]), o: fadeOut(t), pose: {c: .25, a: .3}})});
+    } else {
+      // the board drops down the face and rolls out; the rider tumbles down after it and lies there a moment
+      segs.push({d: 2.4, f: t => {
+        const bs = 1 - clamp(t/.3), [bx0, by0] = qp(Math.max(0, bs));
+        const board = t < .3 ? {x: bx0, y: by0, u: qt(Math.max(.001, bs)), rot: 30*t} : {x: lerp(Q0[0], -110, (t - .3)/.7), y: Q0[1], u: [1, 0]};
+        const fs = 1 - clamp(t/.45), [fx, fy] = qp(Math.max(0, fs));
+        const body = t < .45 ? {x: fx + 10, y: fy - 6, u: qt(Math.max(.001, fs)), rot: 220*t/.45} : {x: Q0[0] + 34, y: Q0[1] + 4, u: [1, 0], rot: 95};
+        return {board, body, x: fx, y: fy, u: [1, 0], o: 1 - smooth((t - .82)/.18), pose: {c: .3, a: .9}}; }});
+    }
+    return seq(segs);
+  }
+
+  // stair handrail: roll along the deck from the right, ollie onto the rail, grind down, drop to the ground, roll out
+  function handrailRun(trick){
+    const uL = [-1, 0], bail = trick === 'bail';
+    const top = [H0[0] + HU[0]*-2, H0[1] - 4];
+    const segs = [
+      {d: 1.0, f: t => ({x: lerp(1690, 1392, t), y: DECK, u: uL, o: fadeIn(t), pose: {c: .25, a: .3}})},
+      {d: .38, f: t => ({x: lerp(1392, top[0], t), y: lerp(DECK, top[1], t) - 34*bump(t), u: uL, pose: {c: .35 + .35*bump(t), a: .55}, boardLift: 4*bump(t)})},
+    ];
+    const railAt = t => [lerp(top[0], H1[0], t), lerp(top[1], H1[1] - 4, t)];
+    const grindFrame = (t, shove) => { const [x, y] = railAt(t); return {x, y, u: HU, shove, spin: shove ? 70 : 0, pose: {c: .5, a: .7, lean: shove ? .2 : 0}}; };
+    if (!bail){
+      segs.push({d: 1.0, f: t => grindFrame(t, trick === 'board' ? 90 : 0)});
+      segs.push({d: .36, f: t => ({x: lerp(H1[0], 1086, t), y: lerp(H1[1] - 4, FOOT, t) - 18*bump(t), u: uL, pose: {c: .4 + .3*bump(t), a: .55}})});
+      segs.push({d: 1.0, f: t => ({x: lerp(1086, 930, t), y: FOOT, u: uL, o: fadeOut(t), pose: {c: .25, a: .3}})});
+    } else {
+      segs.push({d: .5, f: t => grindFrame(t*.5, 0)});
+      // the rider slips off the rail and falls to the ground beside the stairs; the board grinds on and clatters down
+      segs.push({d: 2.2, f: t => {
+        const [sx, sy] = railAt(.5);
+        const body = t < .4 ? {x: lerp(sx, sx - 40, t/.4), y: sy + (FOOT + 4 - sy)*Math.pow(t/.4, 2), u: HU, rot: -180*t/.4} : {x: sx - 40, y: FOOT + 4, u: uL, rot: -95};
+        const board = t < .35 ? (() => { const [bx, by] = railAt(.5 + .5*t/.35); return {x: bx, y: by, u: HU, rot: 0}; })() : {x: lerp(H1[0], 1010, (t - .35)/.65), y: FOOT, u: uL, rot: 0};
+        return {board, body, x: sx, y: sy, u: uL, o: 1 - smooth((t - .82)/.18), pose: {c: .3, a: .9}}; }});
+    }
+    return seq(segs);
+  }
+
+  // pink rail: roll in from the left, ollie up, grind across, pop off (maybe with a flip) and roll out
+  function railRun(trick){
+    const uR = [1, 0], bail = trick === 'bail';
+    const segs = [
+      {d: .9, f: t => ({x: lerp(770, 918, t), y: RG, u: uR, o: fadeIn(t), pose: {c: .25, a: .3}})},
+      {d: .36, f: t => ({x: lerp(918, R0x, t), y: lerp(RG, RY, t) - 30*bump(t), u: uR, pose: {c: .35 + .35*bump(t), a: .55}, boardLift: 4*bump(t)})},
+    ];
+    const grind = t => ({x: lerp(R0x, R1x, t), y: RY, u: trick === 'nose' ? norm(1, .08) : uR, pose: {c: .5, a: .7, lean: trick === 'nose' ? .6 : 0}});
+    if (!bail){
+      segs.push({d: .95, f: grind});
+      segs.push({d: .42, f: t => ({x: lerp(R1x, 1272, t), y: lerp(RY, RG, t) - 32*bump(t), u: uR, flip: trick === 'flipout' ? 360*smooth(span(t, .05, .75)) : 0, boardLift: 6*bump(t), pose: {c: .4 + .4*bump(t), a: .6}})});
+      segs.push({d: .9, f: t => ({x: lerp(1272, 1420, t), y: RG, u: uR, o: fadeOut(t), pose: {c: .25, a: .3}})});
+    } else {
+      segs.push({d: .4, f: t => grind(t*.4)});
+      // the board stops dead on the rail; the rider flies forward over it and lands on the ground
+      segs.push({d: 2.1, f: t => {
+        const sx = lerp(R0x, R1x, .4);
+        const body = t < .45 ? {x: sx + 120*t/.45, y: RY - 40*bump(t/.45*.6) + (RG + 4 - RY)*Math.pow(t/.45, 2), u: uR, rot: 200*t/.45} : {x: sx + 120 + 20*clamp((t - .45)/.2), y: RG + 4, u: uR, rot: 95};
+        const board = t < .25 ? {x: sx, y: RY, u: uR, rot: 0} : {x: sx - 10*clamp((t - .25)/.2), y: lerp(RY, RG, smooth((t - .25)/.2)), u: uR, rot: -25*clamp((t - .25)/.2)};
+        return {board, body, x: sx, y: RY, u: uR, o: 1 - smooth((t - .82)/.18), pose: {c: .3, a: .9}}; }});
+    }
+    return seq(segs);
+  }
+
+  const LANES = {
+    ramp: {tricks: ['ollie','kickflip','heelflip','shuv','spin','indy','rock','bailflip','bailspin'], make: rampRun, gap: [1.2, 4]},
+    handrail: {tricks: ['5050','board','bail','5050'], make: handrailRun, gap: [2.5, 6]},
+    rail: {tricks: ['5050','flipout','nose','bail'], make: railRun, gap: [2, 5.5]},
+  };
+
+  let svg = null, raf = 0, running = [], last = 0;
+  function startLane(name, delay){
+    const L = LANES[name];
+    running.push({lane: name, wait: delay, run: null, r: null, t: 0, prev: null});
+  }
+  function tick(now){
+    raf = requestAnimationFrame(tick);
+    const dt = Math.min(.1, last ? (now - last)/1000 : 0); last = now;
+    for (const s of running){
+      if (s.wait > 0){ s.wait -= dt; continue; }
+      if (!s.run){ const L = LANES[s.lane]; let tr; do { tr = pick(L.tricks); } while (tr === s.prev && L.tricks.length > 1); s.prev = tr; s.run = L.make(tr); s.r = rider(svg); s.t = 0; }
+      s.t += dt;
+      const f = s.run.at(s.t);
+      if (!f){ s.r.remove(); s.run = null; const g = LANES[s.lane].gap; s.wait = lerp(g[0], g[1], Math.random()); continue; }
+      s.r.draw(f);
+    }
+  }
+  function start(scene){
+    if (svg || !scene || (root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+    svg = el('svg', {viewBox: '0 0 1600 900', preserveAspectRatio: 'xMidYMax slice', 'aria-hidden': 'true'});
+    svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:hidden';
+    scene.appendChild(svg);
+    startLane('ramp', .8); startLane('handrail', 2.2); startLane('rail', 4);
+    raf = requestAnimationFrame(tick);
+    document.addEventListener('visibilitychange', () => { if (document.hidden){ cancelAnimationFrame(raf); raf = 0; } else if (!raf){ last = 0; raf = requestAnimationFrame(tick); } });
+  }
+  root.Sk8Crowd = {start};
+})(typeof window !== 'undefined' ? window : this);
+
+try { Sk8Crowd.start(document.querySelector('.scene')); } catch(e) {}
+</script>
 </body>
 </html>
