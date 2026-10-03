@@ -2518,7 +2518,7 @@ const fmtBal = units => money(units/API, false);
 let balance = 0, levels = [], betIdx = 0, bet = 1, roundBet = 1, mode = 'BASE', busy = false, autoLeft = 0;
 let flags = {}, social = q.get('social') === 'true', replay = q.get('replay') === 'true';
 const sess = {spins: 0, wag: 0, won: 0, t0: Date.now()};
-let speed = 0; try { speed = Math.min(2, Math.max(0, +localStorage.getItem('sk8.speed') || 0)); } catch(e) {}
+let speed = 0; try { speed = Math.min(2, Math.max(0, +localStorage.getItem('sk8.speed2') || 0)); } catch(e) {}
 const SPEEDS = ['NORMAL','TURBO','SUPER TURBO'];
 const T = ms => ms * [1, .4, .12][speed];
 
@@ -2669,7 +2669,7 @@ async function spinAnim(g, mults, sticky, fast, isBonus, opt){
   cells.forEach(c=>c.classList.remove('hit')); $('lineov').innerHTML = '';
   const dg = g.slice(), dm = mults.slice();
   merged.forEach(mg=>{ if (mg.upgrade && !mg.anchor) return; for (let row=0;row<ROWS;row++){ const c = TT.cell(mg.r,row), f = mg.from.find(x=>x.c===c); dg[c] = mg.raw[row]; dm[c] = f ? f.m : mg.anchor && mg.anchor.c === c ? mg.anchor.m : 0; } });
-  if (fast || reduce || speed === 2){ if (speed === 2 && !fast) mascot('ollie'); document.querySelectorAll('.pinov').forEach(o=>o.remove()); for (let c=0;c<CELLS;c++){ if (hold[Math.floor(c/ROWS)]) continue; paintCell(c, dg[c], dm[c], sticky && sticky[c] > 0); } merged.forEach(mg=>setStack(mg.r, mg.M, !!opt.lock)); return false; }
+  if (fast || speed === 2){ if (speed === 2 && !fast) mascot('ollie'); document.querySelectorAll('.pinov').forEach(o=>o.remove()); for (let c=0;c<CELLS;c++){ if (hold[Math.floor(c/ROWS)]) continue; paintCell(c, dg[c], dm[c], sticky && sticky[c] > 0); } merged.forEach(mg=>setStack(mg.r, mg.M, !!opt.lock)); return false; }
   sfx('spinStart'); mascot('ollie');
   // anticipation: two tapes of a kind down means the later reels spin longer (the outcome is already fixed).
   // The rising tape chime only starts at the 2nd tape of a kind; the first one lands quietly.
@@ -2721,7 +2721,7 @@ const cents = v => Math.floor(v*100 + 1e-6)/100;
 async function celebrate(x, amount, cost, unitLabel){
   if (x < 1){ if (amount > 0){ $('msg').innerHTML = `<span style="color:var(--muted)">+${fmt$(amount)}, under the ${fmt$(cost)} it cost.</span>`; sfx('win', x); } return; }
   sfx('win', x); const reached = LADDER.filter(([th])=>x >= th);
-  if (!reached.length || reduce || speed === 2){ const top = reached[reached.length-1]; $('msg').innerHTML = `<strong class="good">${top ? top[1]+' ' : 'WIN '}${fmt$(amount)}</strong> (${fx(x)}x)`; mascot(top ? top[2] : 'kickflip'); return; }
+  if (!reached.length || speed === 2){ const top = reached[reached.length-1]; $('msg').innerHTML = `<strong class="good">${top ? top[1]+' ' : 'WIN '}${fmt$(amount)}</strong> (${fx(x)}x)`; mascot(top ? top[2] : 'kickflip'); return; }
   const cel = $('celebrate'), art = $('cel-art'), word = $('cel-t'); cel.hidden = false; word.textContent = 'SESSION...'; animInto(art, 'idle'); $('cel-x').textContent = ''; $('cel-bar').style.width = '0%';
   const bounds = [0].concat(reached.map(([th])=>th*cost), [amount]), weights = bounds.slice(1).map((v,i)=> i === 0 ? .7 : i === bounds.length-2 ? 1.2 : 1);
   const beat = T(Math.min(2400, 1400 + 200*reached.length)), dur = weights.reduce((a,b)=>a+b,0)*beat, stop = sfx('countUp', dur, x);
@@ -2746,7 +2746,7 @@ $('celebrate').onclick = () => { if (skipCel) skipCel(); };
 // a plain count-up for a free spin's big hit or a bonus total
 async function plainCount(amount, title, dur){
   dur = Math.max(dur, T(1600 + 1000*Math.log10(Math.max(1, amount/roundBet))));
-  if (reduce || speed === 2){ $('msg').innerHTML = `<strong class="good">${title} ${fmt$(amount)}</strong>`; return; }
+  if (speed === 2){ $('msg').innerHTML = `<strong class="good">${title} ${fmt$(amount)}</strong>`; return; }
   const cel = $('celebrate'), art = $('cel-art'); cel.hidden = false; $('cel-t').textContent = title; animInto(art, amount >= 25*roundBet ? 'treflip' : 'kickflip');
   $('cel-x').textContent = `${fx(amount/roundBet)}x YOUR BET`; $('cel-next').textContent = ''; $('cel-bar').style.width = '0%';
   const stop = sfx('countUp', dur, amount/roundBet);
@@ -2763,7 +2763,7 @@ function resetWinBoxes(){ $('totalbox').hidden = true; }
 async function finishRound(res, win, cost){
   if (res && res.bonus && win > 0){
     const x = win/roundBet;
-    if (win >= cost && LADDER.some(([th]) => x >= th) && !(reduce || speed === 2)) return celebrate(x, win, roundBet, 'YOUR BET');
+    if (win >= cost && LADDER.some(([th]) => x >= th) && speed !== 2) return celebrate(x, win, roundBet, 'YOUR BET');
     await plainCount(win, win >= cost ? 'BONUS WIN' : 'BONUS TOTAL', T(1800));
     $('msg').innerHTML = win >= cost ? `<strong class="good">BONUS WIN ${fmt$(win)}</strong> (${fx(x)}x your bet)` : `<span style="color:var(--muted)">Bonus total ${fmt$(win)} (${fx(x)}x your bet), under the ${fmt$(cost)} it cost.</span>`;
     return;
@@ -2798,7 +2798,7 @@ async function playBonus(B, cost, startWin){
     else if (B.start) B.start.forEach((m,c)=>{ if (m) st[c] = 1; });
     // held Legend stacks fold back to their one sticky wild, then the reel spins around it
     const pins = sp.merged.filter(mg=>mg.anchor).map(mg=>mg.anchor);
-    if (pins.length){ pins.forEach(a=>{ st[a.c] = 1; hold[Math.floor(a.c/ROWS)] = false; }); await shrinkStacks(pins, speed === 2 || reduce); }
+    if (pins.length){ pins.forEach(a=>{ st[a.c] = 1; hold[Math.floor(a.c/ROWS)] = false; }); await shrinkStacks(pins, speed === 2); }
     await spinAnim(sp.g, sp.mults, st, false, true, {merged: sp.merged, hold, lock: B.tier === 2});
     drawLines(sp.wins, sp.ramps); run += sp.win; if (sp.win > 0) sfx('bonusSpinWin', sp.win*roundBet/Math.max(cost,1e-9));
     $('lastwin').textContent = fmt$(sp.win*roundBet); $('totalwin').textContent = fmt$(((startWin || 0) + run)*roundBet);
@@ -2995,7 +2995,7 @@ function renderSpeed(){
   const max = flags.disabledTurbo ? 0 : flags.disabledSuperTurbo ? 1 : 2; if (speed > max) speed = max;
   const b = $('speedbtn'); b.hidden = max === 0; b.textContent = 'SPEED: ' + SPEEDS[speed]; b.classList.toggle('on', speed > 0);
 }
-$('speedbtn').onclick = () => { const max = flags.disabledTurbo ? 0 : flags.disabledSuperTurbo ? 1 : 2; speed = (speed + 1) % (max + 1); try { localStorage.setItem('sk8.speed', speed); } catch(e) {} renderSpeed(); };
+$('speedbtn').onclick = () => { const max = flags.disabledTurbo ? 0 : flags.disabledSuperTurbo ? 1 : 2; speed = (speed + 1) % (max + 1); try { localStorage.setItem('sk8.speed2', speed); } catch(e) {} renderSpeed(); };
 document.addEventListener('keydown', e => {
   if (e.code !== 'Space' || flags.disabledSpacebar || replay || !$('modal').hidden || !$('confirm').hidden || $('tab-play').hidden || !$('drawer').hidden || !$('buysheet').hidden) return;
   if (/INPUT|SELECT|BUTTON|TEXTAREA/.test(document.activeElement.tagName)) return;
