@@ -400,6 +400,7 @@ body.replay .ctrlbar,body.replay #menubtn,body.replay .spinwrap,body.replay #buy
         <nav class="tabs menutabs" aria-label="Views">
           <button id="t-play" data-tab="play" hidden>Play</button>
           <button id="t-rules" data-tab="rules">Rules &amp; paytable</button>
+          <button id="t-history" data-tab="history">My history</button>
         </nav>
         <p class="sub" style="margin:12px 0 4px"><label for="musicvol">Music volume</label></p>
         <input type="range" id="musicvol" min="0" max="100" value="45" style="width:100%;accent-color:var(--accent)">
@@ -433,6 +434,10 @@ body.replay .ctrlbar,body.replay #menubtn,body.replay .spinwrap,body.replay #buy
       </div></div>
   </div>
 
+  <section id="tab-history" role="tabpanel" class="panel" hidden>
+    <div class="panelbar"><button class="pill hot" type="button" data-tab-back>&larr; BACK TO GAME</button></div>
+    <div class="rules" id="history"></div>
+  </section>
   <section id="tab-rules" role="tabpanel" class="panel" hidden>
     <div class="panelbar"><button class="pill hot" type="button" data-tab-back>&larr; BACK TO GAME</button></div>
     <div class="rules" id="rules"></div>
@@ -2779,6 +2784,7 @@ const RGS = (() => {
     endRound: () => call('/wallet/end-round', {sessionID}),
     replay: (game, version, mode, event) => call(`/bet/replay/${encodeURIComponent(game)}/${encodeURIComponent(version)}/${encodeURIComponent(mode)}/${encodeURIComponent(event)}`, null, 'GET'),
     hasReplay: !!host,
+    history: () => call('/wallet/history', {sessionID, limit: 100}),
     game: () => call('/game', null, 'GET'),
     deposit: amount => call('/wallet/deposit', {sessionID, amount}),
     sessionID,
@@ -2947,9 +2953,27 @@ document.addEventListener('keydown', e => {
   if (autoLeft){ autoLeft = 0; meta(); return; }
   playRound(mode);
 });
-const TABS = ['play','rules'];
+const TABS = ['play','rules','history'];
+const usd$ = v => (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const when = t => { const s = (Date.now() - t)/1000; return s < 60 ? 'just now' : s < 3600 ? Math.round(s/60) + ' min ago' : s < 86400 ? Math.round(s/3600) + ' h ago' : new Date(t).toLocaleDateString(); };
+async function renderHistory(){
+  const box = $('history'); box.innerHTML = '<div class="win"><div class="bar"><span>MY HISTORY</span></div><div class="body"><p style="margin:0">Loading...</p></div></div>';
+  let d; try { d = await RGS.history(); }
+  catch(e){ box.querySelector('.body').innerHTML = '<p style="margin:0">' + (e.code === 'NETWORK' ? errText(e) : 'History is coming soon.') + '</p>'; return; }
+  const t = d.totals || {}, rows = d.history || [], rtp = t.wagered ? t.won/t.wagered : null;
+  const kv = [['Loaded', usd$(t.deposited || 0)], ['Wagered', usd$(t.wagered || 0)], ['Won', usd$(t.won || 0)], ['Net', usd$(t.net || 0)], ['Your RTP', rtp == null ? '-' : (rtp*100).toFixed(2) + '%'], ['Rounds', (t.rounds || 0).toLocaleString('en-US')], ['Best win', (t.best || 0).toLocaleString('en-US') + 'x']];
+  const label = r => r.type === 'deposit' ? 'Loaded money' : (MODE(r.mode) ? MODE(r.mode).label : r.mode);
+  box.innerHTML = '<div class="win"><div class="bar"><span>MY HISTORY</span></div><div class="body">'
+    + '<p style="margin:0 0 10px">Every round is decided on the game server and logged under this browser\'s session. The game returns 96.01% on average; your own RTP swings a lot over a few hundred spins.</p>'
+    + '<table><tbody>' + kv.map(([k, v]) => '<tr><th>' + k + '</th><td style="text-align:right">' + v + '</td></tr>').join('') + '</tbody></table></div></div>'
+    + '<div class="win"><div class="bar"><span>LATEST ' + rows.length + '</span></div><div class="body" style="overflow-x:auto">'
+    + (rows.length ? '<table><thead><tr><th>When</th><th>What</th><th style="text-align:right">Cost</th><th style="text-align:right">Win</th><th style="text-align:right">x bet</th><th style="text-align:right">Balance</th></tr></thead><tbody>'
+      + rows.map(r => '<tr><td>' + when(r.t) + '</td><td>' + label(r) + '</td><td style="text-align:right">' + (r.type === 'deposit' ? '+' + usd$(r.amount) : usd$(r.cost)) + '</td><td style="text-align:right">' + (r.type === 'deposit' ? '' : usd$(r.win)) + '</td><td style="text-align:right">' + (r.type === 'deposit' ? '' : (r.mult || 0).toLocaleString('en-US') + 'x') + '</td><td style="text-align:right">' + usd$(r.bal) + '</td></tr>').join('')
+      + '</tbody></table>' : '<p style="margin:0">No rounds yet.</p>')
+    + '<p class="sub" style="margin:10px 0 0">Session ' + RGS.sessionID + '</p></div></div>';
+}
 function showTab(name){ TABS.forEach(t => { $('tab-'+t).hidden = t !== name; $('t-'+t).setAttribute('aria-selected', t === name); }); }
-document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { openLayer(null); showTab(b.dataset.tab); });
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => { openLayer(null); showTab(b.dataset.tab); if (b.dataset.tab === 'history') renderHistory(); });
 document.querySelectorAll('[data-tab-back]').forEach(b => b.onclick = () => showTab('play'));
 /* slot chrome: menu, modes/buy sheet, bet -/+ */
 function openLayer(id){ ['drawer','buysheet'].forEach(x => { $(x).hidden = x !== id; }); $('backdrop').hidden = !id; $('menubtn').setAttribute('aria-expanded', id === 'drawer'); }
