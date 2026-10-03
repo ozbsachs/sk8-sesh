@@ -2259,7 +2259,8 @@ function ttPlaySpecial(cfg, P, n, rand){
   for (let i=0;i<n;i++){ const c = pool.splice(rand(pool.length), 1)[0], r = Math.floor(c/TT.ROWS); if (!forced.includes(r)) forced.push(r);
     if (sp.g[c] !== TT.W){ sp.g[c] = TT.W; sp.mults[c] = ttDraw(table, rand); sp.fresh.push(c); } }
   const merged = ttExpand(cfg, sp.g, sp.mults, forced, null);
-  const ramps = ttRamps(rand, n), lw = ttLines(cfg, sp.g, sp.mults, ramps, {n: 0});
+  // cfg.ramp.trick === 0 switches the Trick Spin ramps off (a config without it keeps n ramps, as before)
+  const ramps = ttRamps(rand, ttRampCfg(cfg).trick === 0 ? 0 : n), lw = ttLines(cfg, sp.g, sp.mults, ramps, {n: 0});
   // minimum win: a Trick Spin pays at least cfg.minWin x its price
   const lineWin = cap(cfg, lw.win), floor = (cfg.minWin || 0)*cfg.specialCost[n-1], topUp = lineWin < floor ? floor - lineWin : 0;
   return {kind:'special', n, table: cfg.specialTables[n-1][useB ? 1 : 0], stops: sp.stops, g: sp.g, mults: sp.mults, merged, ramps, wins: lw.wins, lineWin, topUp, capped: lw.win >= cfg.maxWin, tier: -1, bonus: null, total: lineWin + topUp};
@@ -2408,7 +2409,7 @@ function ttFromBook(events){
 
 
 
-const GAME = {"pays":[[0.1,0.4,2],[0.1,0.4,2],[0.2,0.8,3],[0.2,0.8,3],[0.3,1,4],[0.5,2.5,10],[1,3,12],[2,6,15],[3,10,20],[0,0,10]],"maxWin":1000,"maxWinLegend":22500,"maxWinSesh":5000,"multipliers":[2,3,4,5,10,15,20,25],"modes":[{"name":"BASE","label":"Normal","cost":1,"rtp":0.9601,"maxWin":22500,"bonusOneIn":227},{"name":"ANTE","label":"Bonus Boost","cost":2,"rtp":0.9601,"maxWin":22500,"bonusOneIn":102},{"name":"SPECIAL1","label":"Trick Spin: Ollie","cost":25,"rtp":0.9601,"maxWin":1000,"bonusOneIn":null},{"name":"SPECIAL2","label":"Trick Spin: Grind","cost":50,"rtp":0.9601,"maxWin":1000,"bonusOneIn":null},{"name":"SPECIAL3","label":"Trick Spin: Kickflip","cost":100,"rtp":0.9601,"maxWin":1000,"bonusOneIn":null},{"name":"BONUS1","label":"Crew (bonus buy)","cost":125,"rtp":0.9601,"maxWin":854,"bonusOneIn":null},{"name":"BONUS2","label":"Sesh (bonus buy)","cost":250,"rtp":0.9601,"maxWin":5000,"bonusOneIn":null},{"name":"BONUS3","label":"Legend (bonus buy)","cost":500,"rtp":0.9601,"maxWin":22500,"bonusOneIn":null}]};
+const GAME = {"pays":[[0.1,0.4,2],[0.1,0.4,2],[0.2,0.8,3],[0.2,0.8,3],[0.3,1,4],[0.5,2.5,10],[1,3,12],[2,6,15],[3,10,20],[0,0,10]],"maxWin":1000,"maxWinLegend":22500,"maxWinSesh":5000,"multipliers":[2,3,4,5,10,15,20,25],"modes":[{"name":"BASE","label":"Normal","cost":1,"rtp":0.9601,"maxWin":22500,"bonusOneIn":227},{"name":"ANTE","label":"Bonus Boost","cost":2,"rtp":0.9601,"maxWin":22500,"bonusOneIn":101},{"name":"SPECIAL1","label":"Trick Spin: Ollie","cost":25,"rtp":0.9601,"maxWin":1000,"bonusOneIn":null},{"name":"SPECIAL2","label":"Trick Spin: Grind","cost":50,"rtp":0.9601,"maxWin":1000,"bonusOneIn":null},{"name":"SPECIAL3","label":"Trick Spin: Kickflip","cost":100,"rtp":0.9601,"maxWin":1000,"bonusOneIn":null},{"name":"BONUS1","label":"Crew (bonus buy)","cost":125,"rtp":0.9601,"maxWin":788.7,"bonusOneIn":null},{"name":"BONUS2","label":"Sesh (bonus buy)","cost":250,"rtp":0.9601,"maxWin":5000,"bonusOneIn":null},{"name":"BONUS3","label":"Legend (bonus buy)","cost":500,"rtp":0.9601,"maxWin":22500,"bonusOneIn":null}]};
 (() => {
 const $ = id => document.getElementById(id);
 const Art = window.Sk8Art || null, Snd = window.Sk8Audio || null;
@@ -2417,16 +2418,16 @@ const NAMES = ['Cassette','Sneaker','Spray can','Lighter','Cap','Wheels','Trucks
 const SHORT = ['CAS','SNK','SPR','LTR','CAP','WHL','TRK','SKTR','BRD','W','SESH','LGND'];
 const BONUS = [
   {name:'Crew', trig:'3 wilds', desc:'10 free spins. Plain wilds (no multiplier) land often on reels 2-4 and always fill the whole reel.'},
-  {name:'Sesh', trig:'3 SESH tapes', desc:'10 free spins. Wilds land on reels 2-4 and fill the whole reel. Ramps land often and the Trick Combo keeps counting up all bonus.'},
+  {name:'Sesh', trig:'3 SESH tapes', desc:'10 free spins. Wilds land on reels 2-4 and fill the whole reel.'},
   {name:'Legend', trig:'4 SESH tapes (5 for 12 spins)', desc:'10 free spins. Every wild on reels 2-4 fills its reel and stays, and new wilds multiply it up.'}];
 const LINE_COLORS = ['#FFE600','#FF3EA5','#3BE3FF','#9BFF3B','#FF8A00','#C77DFF','#FF5D5D','#00F5B4','#FFD6E8','#7AA2FF','#FFB3FF','#B8FF6B','#FFC247','#6BFFE1','#FF9EAA','#E0E0FF'];
 const MODE = name => GAME.modes.find(m => m.name === name);
 const UI_MODES = [
   {id:'BASE', label:'NORMAL', sub: () => '1x'},
   {id:'ANTE', label:'BONUS BOOST', sub: () => `${MODE('ANTE').cost}x · better bonus chance`},
-  {id:'SPECIAL1', label:'OLLIE', sub: () => `${MODE('SPECIAL1').cost}x · 1 ramp + 1 wild`},
-  {id:'SPECIAL2', label:'GRIND', sub: () => `${MODE('SPECIAL2').cost}x · 2 ramps + 2 wilds`},
-  {id:'SPECIAL3', label:'KICKFLIP', sub: () => `${MODE('SPECIAL3').cost}x · 3 ramps + 3 wilds`}];
+  {id:'SPECIAL1', label:'OLLIE', sub: () => `${MODE('SPECIAL1').cost}x · 1 guaranteed wild`},
+  {id:'SPECIAL2', label:'GRIND', sub: () => `${MODE('SPECIAL2').cost}x · 2 guaranteed wilds`},
+  {id:'SPECIAL3', label:'KICKFLIP', sub: () => `${MODE('SPECIAL3').cost}x · 3 guaranteed wilds`}];
 const TRICK = ['OLLIE','GRIND','KICKFLIP'];
 const BUY_MODES = ['BONUS1','BONUS2','BONUS3'];
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -2883,9 +2884,9 @@ function renderModes(){
 /* confirmations: price, a bet changer, and the bonus odds for Bonus Boost */
 let cfState = null;
 const MODE_INFO = {ANTE: () => `Bonus Boost: every spin costs ${costOf('ANTE')}x your bet and has a better chance of starting a bonus.`,
-  SPECIAL1: () => `OLLIE: costs ${costOf('SPECIAL1')}x your bet. 1 ramp and 1 guaranteed wild on reels 2-4; the wild fills its reel and lines through the ramp get +1x. No bonuses.`,
-  SPECIAL2: () => `GRIND: costs ${costOf('SPECIAL2')}x your bet. 2 ramps and 2 guaranteed wilds on reels 2-4; the wilds fill their reels and lines through a ramp get +1x, +2x... No bonuses.`,
-  SPECIAL3: () => `KICKFLIP: costs ${costOf('SPECIAL3')}x your bet. A ramp on each of reels 2-4 and 3 guaranteed wilds; the wilds fill their reels and lines through a ramp get +1x, +2x, +3x... No bonuses.`};
+  SPECIAL1: () => `OLLIE: costs ${costOf('SPECIAL1')}x your bet. 1 guaranteed wild on reels 2-4 that fills its reel. No bonuses.`,
+  SPECIAL2: () => `GRIND: costs ${costOf('SPECIAL2')}x your bet. 2 guaranteed wilds on reels 2-4 that fill their reels. No bonuses.`,
+  SPECIAL3: () => `KICKFLIP: costs ${costOf('SPECIAL3')}x your bet. 3 guaranteed wilds on reels 2-4 that fill their reels. No bonuses.`};
 const pctOf = n => (100/n < 1 ? (100/n).toFixed(2) : (100/n).toFixed(1)) + '%';
 function cfRender(){
   const s = cfState; if (!s) return;
@@ -2998,8 +2999,8 @@ function slotChrome(){
 /* ---------- rules ---------- */
 function renderRules(){
   const ico = (s, mult) => `<span class="ico">${symHTML(s, s === W ? {mult: mult || 5} : {})}</span>`;
-  const modeRows = GAME.modes.map(m => { const what = {BASE: 'Normal spin.', ANTE: `Bonus Boost: each spin has a 1 in ${MODE('ANTE').bonusOneIn.toLocaleString('en-US')} chance to start a bonus, instead of 1 in ${MODE('BASE').bonusOneIn.toLocaleString('en-US')}. Every spin is independent.`, SPECIAL1: 'Trick Spin: 1 ramp and 1 guaranteed wild on reels 2-4; guaranteed wilds fill their reel. No bonuses.',
-      SPECIAL2: 'Trick Spin: 2 ramps and 2 guaranteed wilds on reels 2-4; guaranteed wilds fill their reels. No bonuses.', SPECIAL3: 'Trick Spin: a ramp on each of reels 2-4 and 3 guaranteed wilds; guaranteed wilds fill their reels. No bonuses.',
+  const modeRows = GAME.modes.map(m => { const what = {BASE: 'Normal spin.', ANTE: `Bonus Boost: each spin has a 1 in ${MODE('ANTE').bonusOneIn.toLocaleString('en-US')} chance to start a bonus, instead of 1 in ${MODE('BASE').bonusOneIn.toLocaleString('en-US')}. Every spin is independent.`, SPECIAL1: 'Trick Spin: 1 guaranteed wild on reels 2-4 that fills its reel. No bonuses.',
+      SPECIAL2: 'Trick Spin: 2 guaranteed wilds on reels 2-4 that fill their reels. No bonuses.', SPECIAL3: 'Trick Spin: 3 guaranteed wilds on reels 2-4 that fill their reels. No bonuses.',
       BONUS1: 'Buys the Crew bonus.', BONUS2: 'Buys the Sesh bonus.', BONUS3: 'Buys the Legend bonus.'}[m.name];
     return `<tr><td>${m.label}</td><td>${m.cost}x bet</td><td>${what}</td><td>${pct(m.rtp)}</td><td>${fx(m.maxWin)}x bet</td></tr>`; }).join('');
   const pays = [0,1,2,3,4,5,6,7,8].map(s => `<tr><td>${ico(s)}${NAMES[s]}</td>${[0,1,2].map(k => `<td>${fx(GAME.pays[s][k])}x</td>`).join('')}</tr>`).join('');
@@ -3009,7 +3010,6 @@ function renderRules(){
     <p style="margin-top:0">Pick a bet and spin. The game has 5 reels, 4 rows and 16 fixed lines. Three or more matching symbols on a line, starting from the leftmost reel, win the amount in the paytable times your bet. Only the highest win on each line pays, and wins on different lines add up.</p>
     <p><strong>Wilds</strong> substitute for every paying symbol. In the base game many wilds are plain (no multiplier); the rest carry a multiplier. When wilds help make a line win, their multipliers are added together and the line win is multiplied by that total. Five wilds on a line pay ${fx(GAME.pays[9][2])}x bet times their total multiplier.</p>
     <p>Wild multipliers you can land: ${GAME.multipliers.map(x => 'x' + x).join(', ')}. Blue wilds show x2 to x4, green x5 to x20, purple x25 and up.</p>
-    <p><strong>Trick Combo:</strong> a RAMP can land on reels 2-4. Every winning line that runs through a ramp gets an extra multiplier added: +1x for the first, +2x for the next, +3x for the one after, starting with the smallest win. These are added to the line's wild multipliers (a line with no wilds counts as 1x, so its first combo makes it 2x). In normal play a ramp lands about 1 spin in 40 and the count starts over every spin. In the Sesh bonus ramps land often and the count keeps going for the whole bonus. Trick Spins always bring 1, 2 or 3 ramps.</p>
     <p><strong>Full wild reels</strong> (bonuses and Trick Spins): wilds on reels 2, 3 and 4 fill their whole reel. If several wilds land on one reel, their multipliers are multiplied together first. Full wild reels on the same line add their multipliers.</p>
     <p>Wins are capped at ${fx(GAME.maxWin)}x your bet, except the Sesh bonus, capped at ${fx(GAME.maxWinSesh)}x, and the Legend bonus, capped at ${fx(GAME.maxWinLegend)}x. When a round reaches the cap it ends and pays the cap. The highest win possible in each mode is listed under Game modes.</p>
     <p><strong>Minimum win:</strong> every bonus (bought or triggered) and every Trick Spin pays at least 10% of its price: Crew ${fx(MODE('BONUS1').cost/10)}x, Sesh ${fx(MODE('BONUS2').cost/10)}x and Legend ${fx(MODE('BONUS3').cost/10)}x your bet, Trick Spins ${fx(MODE('SPECIAL1').cost/10)}x, ${fx(MODE('SPECIAL2').cost/10)}x and ${fx(MODE('SPECIAL3').cost/10)}x. If the spins pay less, the difference is added at the end.</p>
